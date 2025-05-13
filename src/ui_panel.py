@@ -60,7 +60,7 @@ class UIPanelManager:
         self.overview_summary_box = None
 
         # Biến theo dõi vị trí Y hiện tại để sắp xếp các UI element theo chiều dọc
-        self.current_y_offset = 10 # Bắt đầu với padding 10px từ trên xuống
+        self.current_y_offset = 1 # Bắt đầu với padding 10px từ trên xuống
 
         # Gọi các hàm để khởi tạo từng phần của UI
         self._setup_panel()
@@ -78,7 +78,7 @@ class UIPanelManager:
         self.update_pause_button_text(False) # Ban đầu animation không tạm dừng
         self.update_overview_summary(None, False) # Ẩn hộp tóm tắt tổng quan ban đầu
 
-    def _add_spacing(self, amount=10):
+    def _add_spacing(self, amount=1):
         """Thêm khoảng cách dọc và cập nhật self.current_y_offset."""
         self.current_y_offset += amount
 
@@ -121,7 +121,7 @@ class UIPanelManager:
             text='Run Algorithms', manager=self.manager, container=self.control_panel, object_id="#run_button"
         )
         self.current_y_offset += button_height_main
-        self._add_spacing(5) # Khoảng cách nhỏ sau nút Run
+        self._add_spacing(2) # Khoảng cách nhỏ sau nút Run
 
         # Nút Reset Grid và Clear Visuals (nằm trên cùng một hàng)
         button_width_half = (UI_PANEL_WIDTH - 30) // 2 # -20 for panel padding, -10 for space between buttons
@@ -148,7 +148,7 @@ class UIPanelManager:
             text="Build Mode:", manager=self.manager, container=self.control_panel, object_id="#section_title"
         )
         self.current_y_offset += title_height
-        self._add_spacing(5)
+        self._add_spacing(2)
 
         # Các nút chọn chế độ xây dựng (Wall, Trap, Start, End)
         button_width_quarter = (UI_PANEL_WIDTH - 20 - 3 * 5) // 4 # Chiều rộng cho mỗi nút (4 nút, 3 khoảng cách 5px)
@@ -170,7 +170,7 @@ class UIPanelManager:
         # Gán các nút đã tạo vào các thuộc tính tương ứng của class
         self.wall_mode_button, self.trap_mode_button, self.start_mode_button, self.end_mode_button = button_elements
         self.current_y_offset += button_height_small
-        self._add_spacing(5)
+        self._add_spacing(2)
 
         # Nhãn hiển thị chế độ xây dựng hiện tại
         self.current_build_mode_display_label = pygame_gui.elements.UILabel(
@@ -191,7 +191,7 @@ class UIPanelManager:
             text="View Algorithm Details:", manager=self.manager, container=self.control_panel, object_id="#section_title"
         )
         self.current_y_offset += title_height
-        self._add_spacing(5)
+        self._add_spacing(2)
         
         dropdown_options_algo = ["Overview / All Paths"] + self.algorithm_names # Thêm lựa chọn "Overview"
         self.algo_dropdown = pygame_gui.elements.UIDropDownMenu(
@@ -208,7 +208,7 @@ class UIPanelManager:
             text="Load Preset Maze:", manager=self.manager, container=self.control_panel, object_id="#section_title"
         )
         self.current_y_offset += title_height
-        self._add_spacing(5)
+        self._add_spacing(2)
         
         dropdown_options_maze = ["Custom"] + self.maze_names # Thêm lựa chọn "Custom" (người dùng tự vẽ)
         self.maze_dropdown = pygame_gui.elements.UIDropDownMenu(
@@ -231,7 +231,7 @@ class UIPanelManager:
             text="Selected Algorithm Info:", manager=self.manager, container=self.control_panel, object_id="#section_title"
         )
         self.current_y_offset += title_height
-        self._add_spacing(5)
+        self._add_spacing(2)
 
         # Các nhãn hiển thị thông tin (Tên, Cost, Nodes Explored, Time)
         # Các comment sau giải thích việc chọn label_content_width và label_x_offset
@@ -339,7 +339,7 @@ class UIPanelManager:
             text="Algorithms Overview:", manager=self.manager, container=self.control_panel, object_id="#section_title"
         )
         self.current_y_offset += title_height
-        self._add_spacing(5)
+        self._add_spacing(2)
 
         # Tính toán chiều cao còn lại cho overview box để nó lấp đầy phần còn lại của panel
         remaining_height = TOTAL_SCREEN_HEIGHT - self.current_y_offset - 10 # 10 là padding dưới cùng mong muốn
@@ -430,52 +430,40 @@ class UIPanelManager:
             self.pause_resume_button.set_text("Resume Anim" if is_paused else "Pause Anim")
 
     def update_overview_summary(self, path_results_dict, is_overview_mode):
-        """
-        Cập nhật hộp văn bản tóm tắt kết quả của tất cả các thuật toán.
-        Hiển thị hoặc ẩn hộp này tùy theo chế độ xem.
-        :param path_results_dict: Dictionary chứa kết quả của các thuật toán (cost, explored, time_ms).
-        :param is_overview_mode: True nếu đang ở chế độ xem "Overview".
-        """
         if not self.overview_summary_box:
-            return # Tránh lỗi nếu element chưa được tạo
+            return
 
         if is_overview_mode and path_results_dict and len(path_results_dict) > 0:
-            html_content = "<font face=verdana size=3><b>Algorithms Overview:</b><br>" # size=3 cho font chữ
-            html_content += "<table width='100%' border=0 cellpadding=1 cellspacing=0>" # cellspacing=0 để không có khoảng cách giữa các cell
-            # Header của bảng
-            html_content += ("<tr><td width='35%'><b>Algorithm</b></td>"
-                             "<td width='20%' align=right><b>Cost</b></td>"
-                             "<td width='20%' align=right><b>Expl.</b></td>"
-                             "<td width='25%' align=right><b>Time(ms)</b></td></tr>")
+            html_content = "<font face='verdana' size='3'><b>Algorithms Overview:</b><br>" # size=3
             
-            # Sắp xếp kết quả theo chi phí (tăng dần), sau đó theo thời gian (tăng dần)
             sorted_results = sorted(
                 path_results_dict.items(), 
                 key=lambda item: (
-                    (item[1]['cost'] if isinstance(item[1]['cost'], (int, float)) and item[1]['cost'] != float('inf') else float('inf')), # Ưu tiên sắp xếp theo cost
-                    item[1]['time_ms'] if isinstance(item[1]['time_ms'], (int, float)) else float('inf') # Xử lý time_ms có thể là str "N/A"
+                    (item[1]['cost'] if isinstance(item[1]['cost'], (int, float)) and item[1]['cost'] != float('inf') else float('inf')),
+                    item[1]['time_ms'] if isinstance(item[1]['time_ms'], (int, float)) else float('inf')
                 )
             )
 
-            # Thêm từng hàng dữ liệu vào bảng
             for algo_name, data in sorted_results:
                 cost_val = data.get('cost', float('inf'))
                 cost_str = f"{cost_val:.1f}" if isinstance(cost_val, (int, float)) and cost_val != float('inf') else "N/A"
                 
-                explored_val = data.get('explored', []) # Mặc định là list rỗng nếu không có
+                explored_val = data.get('explored', [])
                 explored_str = str(len(explored_val)) if isinstance(explored_val, list) else "N/A"
                 
                 time_val = data.get('time_ms', float('inf'))
                 time_str = f"{time_val:.1f}" if isinstance(time_val, (int, float)) else "N/A"
                 
-                html_content += f"<tr><td>{algo_name}</td><td align=right>{cost_str}</td><td align=right>{explored_str}</td><td align=right>{time_str}</td></tr>"
+                # Hiển thị trên một dòng, dùng ký tự phân cách
+                # Bạn có thể dùng   để thêm chút khoảng trắng nếu muốn
+                # Ví dụ: Cost: {cost_str}  |  Expl: {explored_str}  |  Time: {time_str}ms
+                html_content += f"<b>{algo_name}:</b> C: {cost_str} | Expl: {explored_str} | T: {time_str}ms<br>"
             
-            html_content += "</table></font>"
+            html_content += "</font>"
             self.overview_summary_box.set_text(html_content)
-            self.overview_summary_box.visible = True # Hiển thị hộp tóm tắt
+            self.overview_summary_box.visible = True
         else:
-            # Nếu không ở chế độ overview hoặc không có kết quả, hiển thị thông báo mặc định và ẩn hộp
-            self.overview_summary_box.set_text("<font face=verdana size=3>(Run algorithms for summary)</font>") # size=3
+            self.overview_summary_box.set_text("<font face='verdana' size='1'>(Run algorithms for summary)</font>")
             self.overview_summary_box.visible = False
 
 

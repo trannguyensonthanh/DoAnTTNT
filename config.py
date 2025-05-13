@@ -9,7 +9,7 @@ CELL_SIZE = 32
 
 # Số lượng hàng trong lưới game.
 # Ví dụ: GRID_HEIGHT // CELL_SIZE (600 // 32 ~ 18) được điều chỉnh để đảm bảo lưới vừa khít.
-GRID_ROWS = 18
+GRID_ROWS = 25
 # Số lượng cột trong lưới game.
 # Ví dụ: GRID_WIDTH // CELL_SIZE (800 // 32 = 25).
 GRID_COLS = 25
