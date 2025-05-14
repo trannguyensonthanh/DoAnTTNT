@@ -90,10 +90,10 @@ ANIM_SLIDER_MAX_VAL = 10
 ANIM_SLIDER_DEFAULT_VAL = 5
 
 # Độ trễ (tính bằng giây) giữa việc hiển thị mỗi node trong quá trình animation.
-# Độ trễ tối đa (chậm nhất), tương ứng khi slider ở giá trị MIN_VAL.
-ANIM_VIZ_MAX_DELAY = 0.05
+#  Độ trễ tối đa (chậm nhất), tương ứng khi slider ở giá trị MIN_VAL.
+ANIM_VIZ_MAX_DELAY = 0.2  # Chậm hơn nhiều (0.2 giây mỗi node) -> Trước là 0.05
 # Độ trễ tối thiểu (nhanh nhất), tương ứng khi slider ở giá trị MAX_VAL.
-ANIM_VIZ_MIN_DELAY = 0.001
+ANIM_VIZ_MIN_DELAY = 0.001 # Giữ nguyên (1 mili giây mỗi node)
 # ANIM_VIZ_DEFAULT_DELAY (độ trễ mặc định) thường được tính toán trong `main.py`
 # dựa trên `ANIM_SLIDER_DEFAULT_VAL` và các giá trị min/max delay.
 # Hoặc có thể đặt một giá trị cố định nếu không muốn tính toán phức tạp:
