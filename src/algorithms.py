@@ -300,212 +300,351 @@ def greedy_bfs_search(graph, start_node_rc, goal_node_rc, heuristic_func=heurist
 # Việc xử lý đường chéo và forced neighbors phức tạp hơn trong JPS/JPS+.
 
 # --- JPS HELPER FUNCTIONS ---
-# --- JPS HELPER FUNCTIONS (Cải thiện) ---
+# --- JPS HELPER FUNCTIONS (Cải thiện) --- # Ghi chú này cho thấy phiên bản này đã có sự điều chỉnh so với một bản gốc nào đó.
 def _is_walkable_jps(r, c, grid_data):
-    rows, cols = len(grid_data), len(grid_data[0])
+    """
+    Kiểm tra xem một ô (r, c) có thể đi qua được không trong ngữ cảnh JPS.
+    Một ô có thể đi qua nếu nó nằm trong biên của lưới và không phải là chướng ngại vật.
+
+    Args:
+        r (int): Chỉ số hàng của ô.
+        c (int): Chỉ số cột của ô.
+        grid_data (list of list of GridNode): Dữ liệu lưới game, chứa thông tin về các ô.
+
+    Returns:
+        bool: True nếu ô (r, c) đi qua được, False nếu không.
+    """
+    rows, cols = len(grid_data), len(grid_data[0]) # Lấy kích thước của lưới
+    # Kiểm tra xem (r, c) có nằm ngoài biên không
     if not (0 <= r < rows and 0 <= c < cols): return False
+    # Kiểm tra xem ô đó có phải là chướng ngại vật không
     return not grid_data[r][c].is_obstacle_type()
 
 def _get_node_actual_cost_jps(r, c, grid_data):
+    """
+    Lấy chi phí thực tế để đi qua ô (r, c) trong ngữ cảnh JPS.
+
+    Args:
+        r (int): Chỉ số hàng của ô.
+        c (int): Chỉ số cột của ô.
+        grid_data (list of list of GridNode): Dữ liệu lưới game.
+
+    Returns:
+        float: Chi phí của ô nếu đi qua được, ngược lại là float('inf').
+    """
+    # Nếu ô không đi qua được, chi phí là vô cực
     if not _is_walkable_jps(r,c,grid_data): return float('inf')
+    # Trả về chi phí được định nghĩa trong đối tượng GridNode của ô đó
     return grid_data[r][c].cost
 
 def _jps_jump(current_rc, dr, dc, grid_data, start_rc, goal_rc):
     """
     Hàm đệ quy thực hiện "bước nhảy" trong JPS.
-    Tìm jump point tiếp theo theo hướng (dr, dc) từ current_rc.
-    Cải thiện để xử lý cơ bản đường chéo và forced neighbors.
+    Tìm jump point (điểm nhảy) tiếp theo theo hướng (dr, dc) từ current_rc.
+    Phiên bản này đã được cải thiện để xử lý cơ bản đường chéo và forced neighbors.
+
+    Args:
+        current_rc (tuple): Tọa độ (row, col) của điểm bắt đầu nhảy hiện tại.
+        dr (int): Hướng thay đổi hàng (-1, 0, hoặc 1).
+        dc (int): Hướng thay đổi cột (-1, 0, hoặc 1).
+        grid_data (list of list of GridNode): Dữ liệu lưới game.
+        start_rc (tuple): Tọa độ (row, col) của điểm bắt đầu của toàn bộ thuật toán JPS.
+                          (Lưu ý: start_rc không được sử dụng tích cực trong logic hiện tại của hàm này,
+                           có thể được dùng cho các phiên bản JPS phức tạp hơn hoặc debug).
+        goal_rc (tuple): Tọa độ (row, col) của điểm đích của toàn bộ thuật toán JPS.
+
+    Returns:
+        tuple or None: Tọa độ (row, col) của jump point tìm được, hoặc None nếu không có jump point nào
+                       theo hướng này hoặc gặp chướng ngại vật/biên.
     """
+    # Tính toán tọa độ của ô tiếp theo dựa trên hướng nhảy (dr, dc)
     next_r, next_c = current_rc[0] + dr, current_rc[1] + dc
 
-    if not _is_walkable_jps(next_r, next_c, grid_data): return None
+    # 1. Kiểm tra xem ô tiếp theo có đi được không (trong biên và không phải obstacle)
+    if not _is_walkable_jps(next_r, next_c, grid_data): return None # Nếu không, không có jump point
+    # 2. Nếu ô tiếp theo là điểm đích, thì đó chính là jump point cần tìm
     if (next_r, next_c) == goal_rc: return (next_r, next_c)
 
-    # Kiểm tra forced neighbors
-    if dr != 0 and dc == 0: # Di chuyển dọc (Cardinal)
-        # Forced neighbor bên trái
+    # 3. Kiểm tra forced neighbors (các điểm bắt buộc phải rẽ hoặc dừng lại)
+    #    (next_r, next_c) sẽ là jump point nếu nó có forced neighbor.
+    if dr != 0 and dc == 0: # Di chuyển dọc (Cardinal - theo hàng)
+        # Kiểm tra forced neighbor bên trái:
+        #   - Ô ngay bên trái (next_r, next_c - 1) là tường/chướng ngại vật.
+        #   - Ô chéo phía trước bên trái (next_r + dr, next_c - 1) đi được.
         if (not _is_walkable_jps(next_r, next_c - 1, grid_data) and \
             _is_walkable_jps(next_r + dr, next_c - 1, grid_data)):
-            return (next_r, next_c)
-        # Forced neighbor bên phải
+            return (next_r, next_c) # (next_r, next_c) là jump point
+        # Kiểm tra forced neighbor bên phải:
+        #   - Ô ngay bên phải (next_r, next_c + 1) là tường/chướng ngại vật.
+        #   - Ô chéo phía trước bên phải (next_r + dr, next_c + 1) đi được.
         if (not _is_walkable_jps(next_r, next_c + 1, grid_data) and \
             _is_walkable_jps(next_r + dr, next_c + 1, grid_data)):
-            return (next_r, next_c)
-    elif dc != 0 and dr == 0: # Di chuyển ngang (Cardinal)
-        # Forced neighbor phía trên
+            return (next_r, next_c) # (next_r, next_c) là jump point
+    elif dc != 0 and dr == 0: # Di chuyển ngang (Cardinal - theo cột)
+        # Kiểm tra forced neighbor phía trên:
+        #   - Ô ngay phía trên (next_r - 1, next_c) là tường/chướng ngại vật.
+        #   - Ô chéo phía trước bên trên (next_r - 1, next_c + dc) đi được.
         if (not _is_walkable_jps(next_r - 1, next_c, grid_data) and \
             _is_walkable_jps(next_r - 1, next_c + dc, grid_data)):
-            return (next_r, next_c)
-        # Forced neighbor phía dưới
+            return (next_r, next_c) # (next_r, next_c) là jump point
+        # Kiểm tra forced neighbor phía dưới:
+        #   - Ô ngay phía dưới (next_r + 1, next_c) là tường/chướng ngại vật.
+        #   - Ô chéo phía trước bên dưới (next_r + 1, next_c + dc) đi được.
         if (not _is_walkable_jps(next_r + 1, next_c, grid_data) and \
             _is_walkable_jps(next_r + 1, next_c + dc, grid_data)):
-            return (next_r, next_c)
+            return (next_r, next_c) # (next_r, next_c) là jump point
     elif dr != 0 and dc != 0: # Di chuyển chéo (Diagonal)
-        # Kiểm tra xem có jump point nào nếu tiếp tục nhảy theo chiều ngang hoặc dọc từ (next_r, next_c)
-        # Đây là một phần quan trọng của JPS+ để xác định forced neighbors trên đường chéo
+        # Đối với di chuyển chéo, (next_r, next_c) là jump point nếu:
+        #   - Tiếp tục nhảy theo chiều dọc từ (next_r, next_c) theo hướng (dr, 0) tìm được một jump point.
+        #   - HOẶC tiếp tục nhảy theo chiều ngang từ (next_r, next_c) theo hướng (0, dc) tìm được một jump point.
+        # Điều này có nghĩa là nếu di chuyển thẳng từ (next_r, next_c) (theo một trong hai thành phần của hướng chéo)
+        # dẫn đến một forced neighbor, thì (next_r, next_c) là một jump point.
         if _jps_jump((next_r, next_c), dr, 0, grid_data, start_rc, goal_rc) or \
            _jps_jump((next_r, next_c), 0, dc, grid_data, start_rc, goal_rc):
-            return (next_r, next_c)
+            return (next_r, next_c) # (next_r, next_c) là jump point
     
-    # Nếu di chuyển chéo, và không có forced neighbor từ các thành phần ngang/dọc,
-    # thì vẫn tiếp tục nhảy theo đường chéo đó.
+    # 4. Đệ quy nhảy tiếp nếu không có forced neighbor hoặc chưa đến đích
+    # Nếu đang di chuyển chéo (dr != 0 and dc != 0), và không có forced neighbor nào được tìm thấy
+    # từ việc kiểm tra các thành phần ngang/dọc ở trên, thì tiếp tục nhảy theo hướng chéo đó.
     if dr != 0 and dc != 0:
         return _jps_jump((next_r, next_c), dr, dc, grid_data, start_rc, goal_rc)
-    # Nếu di chuyển thẳng và không có forced neighbor, tiếp tục nhảy thẳng.
-    elif dr != 0 or dc != 0 : # Chỉ tiếp tục nhảy nếu là di chuyển thẳng (đã check chéo ở trên)
+    # Nếu đang di chuyển thẳng (dr != 0 hoặc dc != 0, nhưng không phải cả hai cùng khác 0 vì đã check ở trên)
+    # và không có forced neighbor nào được tìm thấy, thì tiếp tục nhảy theo hướng thẳng đó.
+    elif dr != 0 or dc != 0 : # Điều kiện này đảm bảo rằng ít nhất một trong dr, dc khác 0 (có di chuyển)
+                              # và đã loại trừ trường hợp di chuyển chéo không có forced neighbor (được xử lý ở if trên).
          return _jps_jump((next_r, next_c), dr, dc, grid_data, start_rc, goal_rc)
 
-    return None # Nên không bao giờ đến đây nếu dr hoặc dc khác 0
+    # Trường hợp này không nên xảy ra nếu dr hoặc dc khác 0 lúc ban đầu, vì các điều kiện trên
+    # bao phủ hết các khả năng (không đi được, là đích, có forced neighbor, hoặc tiếp tục nhảy).
+    # Tuy nhiên, nó là một fallback an toàn.
+    return None
 
 def jps_search(grid_data, start_rc, goal_rc, heuristic_func=heuristic_manhattan):
+    """
+    Thực hiện thuật toán Jump Point Search (JPS).
+
+    Args:
+        grid_data (list of list of GridNode): Dữ liệu lưới game.
+        start_rc (tuple): Tọa độ (row, col) của điểm bắt đầu.
+        goal_rc (tuple): Tọa độ (row, col) của điểm đích.
+        heuristic_func (function): Hàm heuristic để ước lượng chi phí từ một jump point đến đích.
+
+    Returns:
+        tuple: (path, cost, explored_nodes)
+               - path (list of tuples or None): Danh sách các tọa độ (row, col) tạo thành đường đi chi tiết
+                                                (đã được nội suy giữa các jump point), hoặc None nếu không tìm thấy.
+               - cost (float): Chi phí của đường đi, hoặc float('inf') nếu không tìm thấy.
+               - explored_nodes (list of tuples): Danh sách các jump point đã được khám phá (theo thứ tự).
+    """
+    # open_set: Hàng đợi ưu tiên (min-heap) chứa các jump point cần được xem xét.
+    # Mỗi phần tử là một tuple: (f_cost, g_cost, node_rc, parent_rc)
+    #   - f_cost: Ưu tiên sắp xếp (g_cost đến node_rc + heuristic từ node_rc đến goal_rc).
+    #   - g_cost: Chi phí thực tế từ start_rc để đến jump point node_rc.
+    #   - node_rc: Tọa độ (row, col) của jump point hiện tại.
+    #   - parent_rc: Tọa độ của jump point cha (không thực sự được dùng trong logic pop,
+    #                nhưng có thể hữu ích cho việc debug hoặc các phiên bản phức tạp hơn).
     open_set = []
-    heapq.heappush(open_set, (heuristic_func(start_rc, goal_rc) + 0, 0, start_rc, None)) # f, g, node, parent
-    came_from = {start_rc: None}
+    # Đưa jump point bắt đầu (start_rc) vào open_set.
+    # g_cost ban đầu là 0.
+    heapq.heappush(open_set, (heuristic_func(start_rc, goal_rc) + 0, 0, start_rc, None))
+    
+    # came_from: Dictionary lưu trữ jump point cha của mỗi jump point đã được khám phá.
+    # Dùng để tái tạo đường đi của các jump point sau khi tìm thấy đích.
+    # {child_jump_point: parent_jump_point}
+    came_from = {start_rc: None} # Node bắt đầu không có cha.
+    
+    # g_costs: Dictionary lưu trữ chi phí g_cost (từ start_rc) thấp nhất đã biết để đến một jump point.
+    # {jump_point: g_cost}
     g_costs = {start_rc: 0}
+    
+    # explored_for_viz: Danh sách các jump point đã được pop ra từ open_set và xử lý.
+    # Dùng để trực quan hóa quá trình thuật toán.
     explored_for_viz = []
 
-    while open_set:
+    while open_set: # Khi open_set còn jump point để xem xét
+        # Lấy jump point có f_cost nhỏ nhất từ open_set.
+        # `_` (cho f_cost) và `_` (cho parent_rc) không được dùng trực tiếp ở đây.
         _, g_current_jp, current_jp, _ = heapq.heappop(open_set)
 
-        if current_jp in explored_for_viz: # Nếu jump point này đã được xử lý với cost tốt hơn hoặc bằng
-            if g_current_jp >= g_costs.get(current_jp, float('inf')): # Thêm kiểm tra này
+        # Xử lý việc một jump point có thể được thêm vào open_set nhiều lần với các g_cost khác nhau.
+        # Nếu jump point này đã được explored (nghĩa là đã được pop ra trước đó)
+        # và g_cost hiện tại (g_current_jp) không tốt hơn (nhỏ hơn) g_cost đã lưu
+        # cho jump point này, thì bỏ qua lần xử lý này.
+        if current_jp in explored_for_viz:
+            if g_current_jp >= g_costs.get(current_jp, float('inf')):
                  continue
-        g_costs[current_jp] = g_current_jp # Cập nhật cost tốt nhất đến current_jp
-        explored_for_viz.append(current_jp)
+        # Cập nhật g_cost tốt nhất đã biết để đến current_jp.
+        g_costs[current_jp] = g_current_jp
+        # Thêm current_jp vào danh sách explored (nếu chưa có, để tránh trùng lặp khi append).
+        # explored_for_viz nên chỉ chứa các node đã được pop ra một cách duy nhất.
+        # Việc kiểm tra `current_jp in explored_for_viz` ở trên đã xử lý việc này,
+        # nên ở đây chỉ cần append nếu nó là lần đầu tiên được pop với cost tốt.
+        if current_jp not in explored_for_viz: # Điều kiện này có thể không cần thiết nếu logic ở trên đúng
+            explored_for_viz.append(current_jp)
 
 
+        # Nếu jump point hiện tại là điểm đích, đã tìm thấy đường đi.
         if current_jp == goal_rc:
-            # --- Tái tạo đường đi chi tiết ---
-            path_of_jump_points = []
-            temp = goal_rc
-            while temp is not None:
+            # --- Tái tạo đường đi chi tiết bằng cách nội suy giữa các jump point ---
+            path_of_jump_points = [] # Danh sách các jump point tạo thành đường đi.
+            temp = goal_rc # Bắt đầu từ đích.
+            while temp is not None: # Lần ngược lại theo came_from để lấy các jump point cha.
                 path_of_jump_points.append(temp)
                 temp = came_from.get(temp)
-            path_of_jump_points.reverse()
+            path_of_jump_points.reverse() # Đảo ngược để có thứ tự từ start đến goal.
 
+            # Nếu không có đường đi (path_of_jump_points rỗng, không nên xảy ra nếu goal_rc là current_jp)
             if not path_of_jump_points: return None, float('inf'), explored_for_viz
             
+            # Bắt đầu đường đi chi tiết (interpolated_path) với jump point đầu tiên.
             interpolated_path = [path_of_jump_points[0]]
-            # Cost của ô start được tính một lần
+            # Tính chi phí thực tế của đường đi, bắt đầu bằng chi phí của ô start.
             current_path_actual_cost = _get_node_actual_cost_jps(path_of_jump_points[0][0], path_of_jump_points[0][1], grid_data)
-            if current_path_actual_cost == float('inf'): current_path_actual_cost = 0 # Start node cost should be normal
+            # Nếu ô start không đi được (lỗi logic), chi phí ban đầu là 0.
+            if current_path_actual_cost == float('inf'): current_path_actual_cost = 0
 
+            # Nội suy các ô giữa các cặp jump point liên tiếp.
             for i in range(len(path_of_jump_points) - 1):
-                p1 = path_of_jump_points[i]
-                p2 = path_of_jump_points[i+1]
+                p1 = path_of_jump_points[i]   # Jump point bắt đầu của đoạn.
+                p2 = path_of_jump_points[i+1] # Jump point kết thúc của đoạn.
                 r1, c1 = p1; r2, c2 = p2
                 
-                curr_r, curr_c = r1, c1
+                curr_r, curr_c = r1, c1 # Bắt đầu từ p1.
+                # Di chuyển từng bước từ (curr_r, curr_c) đến p2.
                 while (curr_r, curr_c) != p2:
+                    # Xác định hướng di chuyển (dr_step, dc_step) là 1, 0, hoặc -1.
                     dr_step = (r2 > curr_r) - (r2 < curr_r)
                     dc_step = (c2 > curr_c) - (c2 < curr_c)
-                    curr_r += dr_step
-                    curr_c += dc_step
+                    curr_r += dr_step # Cập nhật hàng.
+                    curr_c += dc_step # Cập nhật cột.
                     
+                    # Kiểm tra (thừa, nhưng để an toàn): ô nội suy phải đi được.
+                    # Nếu JPS hoạt động đúng, điều này không bao giờ xảy ra.
                     if not _is_walkable_jps(curr_r, curr_c, grid_data):
-                        return None, float('inf'), explored_for_viz # Lỗi nội suy
+                        return None, float('inf'), explored_for_viz # Lỗi nội suy.
 
-                    interpolated_path.append((curr_r, curr_c))
-                    # Cộng cost của các ô trên đường đi (KHÔNG BAO GỒM Ô P1 LẦN NỮA)
+                    interpolated_path.append((curr_r, curr_c)) # Thêm ô vào đường đi chi tiết.
+                    # Cộng chi phí của ô vừa thêm vào tổng chi phí.
+                    # Các ô trên đường đi từ p1 đến p2 (không bao gồm p1) sẽ được cộng vào.
                     current_path_actual_cost += _get_node_actual_cost_jps(curr_r, curr_c, grid_data)
             
+            # Trả về đường đi chi tiết, tổng chi phí thực tế, và danh sách jump point đã khám phá.
             return interpolated_path, current_path_actual_cost, explored_for_viz
 
-        # --- Xác định các jump point kế tiếp (successors) ---
-        parent_jp = came_from.get(current_jp)
-        successors_to_consider = []
+        # --- Xác định các jump point kế tiếp (successors) từ current_jp ---
+        parent_jp = came_from.get(current_jp) # Lấy jump point cha của current_jp.
+        successors_to_consider = [] # Danh sách các hướng (dr, dc) cần xem xét để nhảy.
         
-        # Xác định hướng đi chuẩn hóa từ parent đến current_jp (nếu có)
+        # Xác định hướng di chuyển chuẩn hóa (dr_norm, dc_norm) từ parent_jp đến current_jp.
+        # Hướng này giúp xác định các quy tắc cắt tỉa (pruning rules) của JPS.
         dr_norm, dc_norm = 0, 0
-        if parent_jp:
+        if parent_jp: # Nếu current_jp có cha (không phải node bắt đầu).
             r_curr, c_curr = current_jp; r_par, c_par = parent_jp
+            # Tính dr_norm: 1 (xuống), -1 (lên), 0 (không đổi hàng).
             if r_curr != r_par: dr_norm = (r_curr - r_par) // abs(r_curr - r_par)
+            # Tính dc_norm: 1 (phải), -1 (trái), 0 (không đổi cột).
             if c_curr != c_par: dc_norm = (c_curr - c_par) // abs(c_curr - c_par)
 
-        # Duyệt các hướng có thể đi (pruned set of neighbors for JPS)
-        # Nếu là node bắt đầu (không có parent), hoặc di chuyển thẳng
-        if parent_jp is None or (dr_norm == 0 or dc_norm == 0): # Đến từ di chuyển thẳng hoặc là start
-            # Kiểm tra hướng thẳng (nếu có)
-            if dr_norm != 0: # Đang đi dọc
+        # --- Áp dụng Pruning Rules để xác định các hướng nhảy tự nhiên và forced neighbors ---
+        # Nếu là node bắt đầu (parent_jp is None) hoặc đến current_jp bằng cách di chuyển thẳng (dr_norm==0 hoặc dc_norm==0).
+        if parent_jp is None or (dr_norm == 0 or dc_norm == 0):
+            # Kiểm tra hướng nhảy thẳng tự nhiên (natural neighbor).
+            if dr_norm != 0: # Nếu đang đi dọc (dr_norm != 0, dc_norm == 0).
                 if _is_walkable_jps(current_jp[0] + dr_norm, current_jp[1], grid_data):
-                    successors_to_consider.append((dr_norm, 0))
-            if dc_norm != 0: # Đang đi ngang
+                    successors_to_consider.append((dr_norm, 0)) # Thêm hướng nhảy thẳng dọc.
+            # Ghi chú: `elif dc_norm != 0` sẽ đúng hơn ở đây để tránh lặp lại nếu dr_norm và dc_norm đều khác 0 (không nên xảy ra với check trên)
+            if dc_norm != 0: # Nếu đang đi ngang (dc_norm != 0, dr_norm == 0).
                  if _is_walkable_jps(current_jp[0], current_jp[1] + dc_norm, grid_data):
-                    successors_to_consider.append((0, dc_norm))
+                    successors_to_consider.append((0, dc_norm)) # Thêm hướng nhảy thẳng ngang.
             
-            # Kiểm tra forced neighbors cho di chuyển thẳng
-            if dr_norm != 0: # Đang đi dọc
+            # Kiểm tra forced neighbors cho trường hợp di chuyển thẳng.
+            if dr_norm != 0: # Đang đi dọc.
+                # Forced neighbor bên trái-chéo.
                 if not _is_walkable_jps(current_jp[0], current_jp[1] - 1, grid_data) and \
                    _is_walkable_jps(current_jp[0] + dr_norm, current_jp[1] - 1, grid_data):
-                    successors_to_consider.append((dr_norm, -1)) # Forced sang trái-chéo
+                    successors_to_consider.append((dr_norm, -1))
+                # Forced neighbor bên phải-chéo.
                 if not _is_walkable_jps(current_jp[0], current_jp[1] + 1, grid_data) and \
                    _is_walkable_jps(current_jp[0] + dr_norm, current_jp[1] + 1, grid_data):
-                    successors_to_consider.append((dr_norm, 1)) # Forced sang phải-chéo
-            elif dc_norm != 0: # Đang đi ngang
+                    successors_to_consider.append((dr_norm, 1))
+            elif dc_norm != 0: # Đang đi ngang.
+                # Forced neighbor lên-chéo.
                 if not _is_walkable_jps(current_jp[0] - 1, current_jp[1], grid_data) and \
                    _is_walkable_jps(current_jp[0] - 1, current_jp[1] + dc_norm, grid_data):
-                    successors_to_consider.append((-1, dc_norm)) # Forced lên-chéo
+                    successors_to_consider.append((-1, dc_norm))
+                # Forced neighbor xuống-chéo.
                 if not _is_walkable_jps(current_jp[0] + 1, current_jp[1], grid_data) and \
                    _is_walkable_jps(current_jp[0] + 1, current_jp[1] + dc_norm, grid_data):
-                    successors_to_consider.append((1, dc_norm))   # Forced xuống-chéo
+                    successors_to_consider.append((1, dc_norm))
             
-            # Nếu là node bắt đầu, thêm tất cả 8 hướng
+            # Nếu là node bắt đầu, cần thêm tất cả 8 hướng nhảy tiềm năng nếu ô đó đi được.
+            # Các hướng đã được thêm ở trên (natural/forced) sẽ không được thêm lại nếu dùng set sau này.
             if parent_jp is None:
                 all_directions = [(0,1), (0,-1), (1,0), (-1,0), (1,1), (1,-1), (-1,1), (-1,-1)]
                 for dr_add, dc_add in all_directions:
-                    if (dr_add, dc_add) not in successors_to_consider and _is_walkable_jps(current_jp[0]+dr_add, current_jp[1]+dc_add, grid_data):
+                    # Chỉ thêm nếu hướng này chưa có và ô kế tiếp theo hướng đó đi được.
+                    if (dr_add, dc_add) not in successors_to_consider and \
+                       _is_walkable_jps(current_jp[0]+dr_add, current_jp[1]+dc_add, grid_data):
                         successors_to_consider.append((dr_add, dc_add))
 
-
-        # Nếu di chuyển chéo đến current_jp (dr_norm != 0 and dc_norm != 0)
+        # Nếu đến current_jp bằng cách di chuyển chéo (dr_norm != 0 and dc_norm != 0).
         elif dr_norm != 0 and dc_norm != 0:
-            # 1. Nhảy theo hướng ngang (thành phần của đường chéo)
+            # 1. Luôn xem xét nhảy theo hướng ngang (thành phần của đường chéo).
             if _is_walkable_jps(current_jp[0], current_jp[1] + dc_norm, grid_data):
                 successors_to_consider.append((0, dc_norm))
-            # 2. Nhảy theo hướng dọc (thành phần của đường chéo)
+            # 2. Luôn xem xét nhảy theo hướng dọc (thành phần của đường chéo).
             if _is_walkable_jps(current_jp[0] + dr_norm, current_jp[1], grid_data):
                 successors_to_consider.append((dr_norm, 0))
-            # 3. Nhảy tiếp theo hướng chéo (nếu ô đó đi được)
+            # 3. Luôn xem xét nhảy tiếp theo hướng chéo hiện tại (nếu ô đó đi được).
             if _is_walkable_jps(current_jp[0] + dr_norm, current_jp[1] + dc_norm, grid_data):
                 successors_to_consider.append((dr_norm, dc_norm))
+            # Ghi chú: JPS+ sẽ có thêm logic kiểm tra forced neighbors khi đến từ đường chéo.
+            # Ví dụ, nếu đến từ (dr,dc), nó sẽ kiểm tra forced neighbor theo hướng (dr, -dc) và (-dr, dc).
+            # Phiên bản này chưa có logic đó.
 
-        # Thực hiện nhảy cho các hướng đã xác định
-        actual_successors_jp = []
-        for dr_s, dc_s in set(successors_to_consider): # Dùng set để loại bỏ hướng trùng lặp
+        # Thực hiện các bước nhảy cho tất cả các hướng đã được xác định là cần xem xét.
+        actual_successors_jp = [] # Danh sách các jump point kế tiếp thực sự tìm được.
+        for dr_s, dc_s in set(successors_to_consider): # Dùng set để loại bỏ các hướng trùng lặp.
             jump_point = _jps_jump(current_jp, dr_s, dc_s, grid_data, start_rc, goal_rc)
-            if jump_point:
+            if jump_point: # Nếu tìm được một jump point theo hướng (dr_s, dc_s).
                 actual_successors_jp.append(jump_point)
 
-        # Xử lý các jump point kế tiếp
-        for successor_jp_node in set(actual_successors_jp):
-            cost_segment = 0
-            temp_r, temp_c = current_jp
-            path_to_successor_segment = [] # Để tính cost chính xác
+        # Xử lý các jump point kế tiếp đã tìm được.
+        for successor_jp_node in set(actual_successors_jp): # Dùng set để loại bỏ jump point trùng lặp.
+            cost_segment = 0 # Chi phí của đoạn đường từ current_jp đến successor_jp_node.
+            temp_r, temp_c = current_jp # Bắt đầu từ current_jp.
+            path_to_successor_segment = [] # Lưu các ô trên đoạn đường này để tính cost chính xác.
 
+            # Nội suy các ô trên đoạn đường từ current_jp đến successor_jp_node.
             while (temp_r, temp_c) != successor_jp_node:
                 dr_step = (successor_jp_node[0] > temp_r) - (successor_jp_node[0] < temp_r)
                 dc_step = (successor_jp_node[1] > temp_c) - (successor_jp_node[1] < temp_c)
                 temp_r += dr_step
                 temp_c += dc_step
-                path_to_successor_segment.append((temp_r, temp_c)) # Lưu các ô trên đoạn đường
+                path_to_successor_segment.append((temp_r, temp_c)) # Thêm ô vào đoạn đường.
                 
-            # Tính cost của đoạn đường này
+            # Tính tổng chi phí của đoạn đường này.
             for seg_r, seg_c in path_to_successor_segment:
                  current_cell_cost = _get_node_actual_cost_jps(seg_r, seg_c, grid_data)
-                 if current_cell_cost == float('inf'):
-                     cost_segment = float('inf'); break
-                 cost_segment += current_cell_cost
+                 if current_cell_cost == float('inf'): # Nếu gặp chướng ngại vật trên đoạn đường.
+                     cost_segment = float('inf'); break # Chi phí là vô cực.
+                 cost_segment += current_cell_cost # Cộng dồn chi phí.
             
-            if cost_segment == float('inf'): continue
+            if cost_segment == float('inf'): continue # Bỏ qua successor này nếu không đến được.
 
+            # Tính g_cost mới để đến successor_jp_node.
             new_g_to_successor_jp = g_current_jp + cost_segment
 
+            # Nếu tìm thấy đường đi tốt hơn (chi phí thấp hơn) đến successor_jp_node.
             if new_g_to_successor_jp < g_costs.get(successor_jp_node, float('inf')):
-                g_costs[successor_jp_node] = new_g_to_successor_jp
+                g_costs[successor_jp_node] = new_g_to_successor_jp # Cập nhật g_cost.
+                # Tính f_cost cho successor_jp_node.
                 f_cost_val = new_g_to_successor_jp + heuristic_func(successor_jp_node, goal_rc)
+                # Thêm vào open_set.
                 heapq.heappush(open_set, (f_cost_val, new_g_to_successor_jp, successor_jp_node, current_jp))
-                came_from[successor_jp_node] = current_jp
+                came_from[successor_jp_node] = current_jp # Lưu jump point cha.
                 
+    # Nếu open_set rỗng mà chưa tìm thấy đích, nghĩa là không có đường đi.
     return None, float("inf"), explored_for_viz
 # --- BIDIRECTIONAL A* SEARCH ---
 # Tìm kiếm A* từ cả điểm bắt đầu và điểm kết thúc đồng thời.
